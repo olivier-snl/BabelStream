@@ -174,7 +174,7 @@ std::vector<std::vector<double>> run_triad(Stream<T> *stream)
 
 // Run the Copy kernel
 template <typename T>
-std::vector<std::vector<double>> run_triad(Stream<T> *stream)
+std::vector<std::vector<double>> run_copy(Stream<T> *stream)
 {
 
   std::vector<std::vector<double>> timings(1);
@@ -234,7 +234,11 @@ void run()
       std::cout << "Running triad " << num_times << " times" << std::endl;
       std::cout << "Number of elements: " << ARRAY_SIZE << std::endl;
     }
-
+    else if (selection == Benchmark::Copy)
+    {
+      std::cout << "Running copy " << num_times << " times" << std::endl;
+      std::cout << "Number of elements: " << ARRAY_SIZE << std::endl;
+    }
 
     if (sizeof(T) == sizeof(float))
       std::cout << "Precision: float" << std::endl;
@@ -539,6 +543,9 @@ void check_solution(const unsigned int ntimes, std::vector<T>& a, std::vector<T>
     } else if (selection == Benchmark::Triad)
     {
       goldA = goldB + scalar * goldC;
+    } else if (selection == Benchmark::Copy)
+    {
+      goldC = goldA;
     } else if (selection == Benchmark::Nstream)
     {
       goldA += goldB + scalar * goldC;
