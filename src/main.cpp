@@ -70,7 +70,7 @@ void run();
 // - All 5 kernels (Copy, Add, Mul, Triad, Dot).
 // - Triad only.
 // - Nstream only.
-enum class Benchmark {All, Triad, Nstream};
+enum class Benchmark {All, Triad, Copy, Nstream};
 
 // Selected run options.
 Benchmark selection = Benchmark::All;
@@ -163,6 +163,30 @@ std::vector<std::vector<double>> run_triad(Stream<T> *stream)
   for (unsigned int k = 0; k < num_times; k++)
   {
     stream->triad();
+  }
+  t2 = std::chrono::high_resolution_clock::now();
+
+  double runtime = std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+  timings[0].push_back(runtime);
+
+  return timings;
+}
+
+// Run the Copy kernel
+template <typename T>
+std::vector<std::vector<double>> run_triad(Stream<T> *stream)
+{
+
+  std::vector<std::vector<double>> timings(1);
+
+  // Declare timers
+  std::chrono::high_resolution_clock::time_point t1, t2;
+
+  // Run triad in loop
+  t1 = std::chrono::high_resolution_clock::now();
+  for (unsigned int k = 0; k < num_times; k++)
+  {
+    stream->copy();
   }
   t2 = std::chrono::high_resolution_clock::now();
 
@@ -315,6 +339,9 @@ void run()
     case Benchmark::Triad:
       timings = run_triad<T>(stream);
       break;
+    case Benchmark::Copy:
+      timings = run_copy<T>(stream);
+      break;
     case Benchmark::Nstream:
       timings = run_nstream<T>(stream);
       break;
@@ -447,8 +474,43 @@ void run()
         << std::left << std::setprecision(3)
         << bandwidth << std::endl;
     }
-  }
+  } else if (selection == Benchmark::Copy)
+  {
+    // Display timing results
+    double total_bytes = 2 * sizeof(T) * ARRAY_SIZE * num_times;
+    double bandwidth = ((mibibytes) ? pow(2.0, -30.0) : 1.0E-9) * (total_bytes / timings[0][0]);
 
+    if (output_as_csv)
+    {
+      std::cout
+        << "function" << csv_separator
+        << "num_times" << csv_separator
+        << "n_elements" << csv_separator
+        << "sizeof" << csv_separator
+        << ((mibibytes) ? "gibytes_per_sec" : "gbytes_per_sec") << csv_separator
+        << "runtime"
+        << std::endl;
+      std::cout
+        << "Copy" << csv_separator
+        << num_times << csv_separator
+        << ARRAY_SIZE << csv_separator
+        << sizeof(T) << csv_separator
+        << bandwidth << csv_separator
+        << timings[0][0]
+        << std::endl;
+    }
+    else
+    {
+      std::cout
+        << "--------------------------------"
+        << std::endl << std::fixed
+        << "Runtime (seconds): " << std::left << std::setprecision(5)
+        << timings[0][0] << std::endl
+        << "Bandwidth (" << ((mibibytes) ? "GiB/s" : "GB/s") << "):  "
+        << std::left << std::setprecision(3)
+        << bandwidth << std::endl;
+    }
+  }
   delete stream;
 
 }
@@ -581,6 +643,10 @@ void parseArguments(int argc, char *argv[])
     {
       selection = Benchmark::Triad;
     }
+    else if (!std::string("--copy-only").compare(argv[i]))
+    {
+      selection = Benchmark::Copy;
+    }
     else if (!std::string("--nstream-only").compare(argv[i]))
     {
       selection = Benchmark::Nstream;
@@ -606,6 +672,7 @@ void parseArguments(int argc, char *argv[])
       std::cout << "  -n  --numtimes   NUM     Run the test NUM times (NUM >= 2)" << std::endl;
       std::cout << "      --float              Use floats (rather than doubles)" << std::endl;
       std::cout << "      --triad-only         Only run triad" << std::endl;
+      std::cout << "      --copy-only          Only run copy" << std::endl;
       std::cout << "      --nstream-only       Only run nstream" << std::endl;
       std::cout << "      --csv                Output as csv table" << std::endl;
       std::cout << "      --mibibytes          Use MiB=2^20 for bandwidth calculation (default MB=10^6)" << std::endl;
